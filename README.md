@@ -16,6 +16,8 @@ if it occurs too soon).
 
 The signature of `:delay_fun` is: `delay_fun(restart_count :: integer, child_id :: term) :: integer`
 
+Below an example usage with an exponential backoff strategy: (200*2^count) ms delay.
+
 ```Elixir
 import TemporizedSupervisor.Spec
 import Bitwise
@@ -24,6 +26,33 @@ TemporizedSupervisor.start_link([
   worker(MyServer2,[])
 ], restart_strategy: :one_for_one, delay_fun: fn count,_id-> 200*(1 <<< count) end)
 ```
+
+## How it works
+
+The created "supervisor" creates actually the following supervision tree :
+
+`supervise([child1,child2], strategy: :one_for_one)` =>
+
+```
+
+                         +--------------+
+                         |  DelayManager|
++--------------+-------> +--------------+
+|   FrontSup   |         +--------------+       +----------+      +---------+
++--------------+-------> |  MiddleSup   +------>+TempServer+----->+ Child1  |
+                         +--------------+       +----------+      +---------+
+                                        |       +----------+      +---------+
+                                        +------>+TempServer+----->+ Child2  |
+                                                +----------+      +---------+
+```
+
+`DelayManager` maintains a restart count by `child_id` and the
+`delay_fun`.
+`TempServer` (actually `TemporizedServer`) is an intermediate process
+which can delay its death relatively to its linked server.
+
+When you call `TemporizedSupervisor` functions on `FrontSup`, it
+actually proxify the query to the `MiddleSup`.
 
 ## Installation
 
