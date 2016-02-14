@@ -14,7 +14,7 @@ All the same as `Supervisor`, but a new option is available: `:delay_fun` which 
 function returning the minimum lifetime of a child in millisecond (child death will be delayed
 if it occurs too soon).
 
-The signature of `:delay_fun` is: `delay_fun(restart_count :: integer, child_id :: term) :: integer`
+The signature of `:delay_fun` is: `(restart_count :: integer, child_id :: term) -> ms_delay_death :: integer`
 
 Below an example usage with an exponential backoff strategy: (200*2^count) ms delay.
 

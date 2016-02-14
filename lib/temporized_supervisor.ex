@@ -4,7 +4,7 @@ defmodule TemporizedSupervisor do
     except that the supervisor options now supports `:delay_fun` as
     an option.
 
-    The signature of `:delay_fun` is: `delay_fun(restart_count :: integer, child_id :: term) :: integer`,
+    The signature of `:delay_fun` is: `(restart_count :: integer, child_id :: term) -> ms_delay_death :: integer`,
     it takes the restart count and the id of the child and returns a delay in millisecond.
 
     This delay will be the minimum lifetime of the child in millisecond : child death will be delayed
@@ -24,12 +24,13 @@ defmodule TemporizedSupervisor do
     def supervise(children, options) do
       ids = for {id,_,_,_,_,_}<-children, do: id
       Supervisor.Spec.supervise([
-        Supervisor.Spec.worker(DelayManager, [options[:delay_fun],ids]),
-        Supervisor.Spec.supervisor(MiddleSup, [children,Dict.drop(options,[:delay_fun,:name])])
+        Supervisor.Spec.worker(TemporizedSupervisor.DelayManager, [options[:delay_fun],ids]),
+        Supervisor.Spec.supervisor(TemporizedSupervisor.MiddleSup, [children,Dict.drop(options,[:delay_fun,:name])])
       ], strategy: :one_for_all, max_restarts: 0)
     end
 
-    defdelegate [worker(mod,args,opts),supervisor(mod,args,opts)], to: Supervisor.Spec
+    defdelegate [worker(mod,args), worker(mod,args,opts),
+                 supervisor(mod,args), supervisor(mod,args,opts)], to: Supervisor.Spec
   end
 
   defmodule MiddleSup do
