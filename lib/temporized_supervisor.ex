@@ -22,78 +22,50 @@ defmodule TemporizedSupervisor do
 
   defmodule Spec do
     def supervise(children, options) do
-      ids = for {id,_,_,_,_,_}<-children, do: id
-      Supervisor.Spec.supervise([
-        Supervisor.Spec.worker(TemporizedSupervisor.DelayManager, [options[:delay_fun],ids]),
-        Supervisor.Spec.supervisor(TemporizedSupervisor.MiddleSup, [children,Dict.drop(options,[:delay_fun,:name])])
-      ], strategy: :one_for_all, max_restarts: 0)
+      {Supervisor.Spec.supervise(Enum.map(children,&map_childspec/1), options),options}
+    end
+
+    def map_childspec({id,mfa,restart,shutdown,worker,modules}) do
+      {id,{__MODULE__, :start_temporized, [id,mfa,shutdown]},restart,:infinity,worker,modules}
+    end
+
+    def start_temporized(id,{m,f,a},shutdown) do
+      restart_count = Process.get(id, 0)
+      Process.put(id, restart_count + 1)
+      delay = Process.get(:delay_fun).(restart_count,id)
+      TemporizedServer.start_link(m, a, function: f, delay: delay, shutdown: shutdown)
     end
 
     defdelegate [worker(mod,args), worker(mod,args,opts),
                  supervisor(mod,args), supervisor(mod,args,opts)], to: Supervisor.Spec
   end
 
-  defmodule MiddleSup do
-    def map_childspec({id,mfa,restart,shutdown,worker,modules}) do
-      {id,{__MODULE__, :start_temporized, [id,mfa]},restart,shutdown,worker,modules}
+  defmodule ProxySup do
+    @behaviour :supervisor
+    def init({mod,arg}) do
+      {sup_spec,options} = mod.init(arg)
+      Process.put(:delay_fun,options[:delay_fun] || fn _,_->0 end)
+      sup_spec
     end
-
-    def start_link(children,options) do
-      Supervisor.start_link(Enum.map(children,&map_childspec/1), options)
-    end
-
-    def start_temporized(id,{m,f,a}) do
-      [delay_manager_sup|_] = Process.get(:"$ancestors")
-      [{_,delay_manager,_,_}|_] = Supervisor.which_children(delay_manager_sup)
-      delay = GenServer.call(delay_manager,{:delay,id})
-      TemporizedServer.start_link(m, a, function: f, delay: delay)
-    end
-  end
-
-  defmodule DelayManager do
-    use GenServer
-    def start_link(delay_fun,ids), do:
-      GenServer.start_link(__MODULE__,{delay_fun,ids |> Enum.map(&{&1,0}) |> Enum.into(%{})})
-    def handle_call({:delay,id},_,{delay_fun,counters}), do:
-      {:reply,delay_fun.(counters[id],id),{delay_fun,Dict.update!(counters,id,& &1 + 1)}}
-  end
-
-  defp middle_sup(supervisor) do
-    [_,{_,sup_pid,_,_}] = Supervisor.which_children(supervisor)
-    sup_pid
   end
   
   def start_link(children, options) when is_list(children), do:
     start_link(Supervisor.Default, Spec.supervise(children, options), options)
   def start_link(module, arg, options \\ []) when is_list(options), do:
-    Supervisor.start_link(module,arg,options)
-
-  def count_children(supervisor), do:
-    Supervisor.count_children(middle_sup(supervisor))
+    Supervisor.start_link(ProxySup,{module,arg},options)
 
   def which_children(supervisor) do
-    for {id,pid,worker,modules}<-Supervisor.which_children(middle_sup(supervisor)) do
+    for {id,pid,worker,modules}<-Supervisor.which_children(supervisor) do
       {id,GenServer.call(pid,:temporized_pid),worker,modules}
     end
   end
 
   def start_child(supervisor, child_spec) do
-    Supervisor.start_child(middle_sup(supervisor), MiddleSup.map_childspec(child_spec))
+    Supervisor.start_child(supervisor, MiddleSup.map_childspec(child_spec))
   end
 
-  def terminate_child(supervisor, child) do
-    Supervisor.terminate_child(middle_sup(supervisor), child)
-  end
-
-  def delete_child(supervisor, child_id) do
-    Supervisor.delete_child(middle_sup(supervisor), child_id)
-  end
-
-  def restart_child(supervisor, child_id) do
-    Supervisor.restart_child(middle_sup(supervisor), child_id)
-  end
-
-  defdelegate [stop(sup),stop(sup,r),stop(sup,r,t)], to: Supervisor
+  defdelegate [stop(sup),stop(sup,r),stop(sup,r,t), count_children(sup), terminate_child(sup,child), 
+               delete_child(sup,childid), restart_child(sup,childid)], to: Supervisor
 
   defmacro __using__(_) do
     quote location: :keep do

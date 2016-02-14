@@ -34,25 +34,21 @@ The created "supervisor" creates actually the following supervision tree :
 `supervise([child1,child2], strategy: :one_for_one)` =>
 
 ```
-
-                         +--------------+
-                         |  DelayManager|
-+--------------+-------> +--------------+
-|   FrontSup   |         +--------------+       +----------+      +---------+
-+--------------+-------> |  MiddleSup   +------>+TempServer+----->+ Child1  |
-                         +--------------+       +----------+      +---------+
-                                        |       +----------+      +---------+
-                                        +------>+TempServer+----->+ Child2  |
-                                                +----------+      +---------+
++--------------+       +----------+      +---------+
+| Supervisor   +------>+TempServer+----->+ Child1  |
++--------------+       +----------+      +---------+
+               |       +----------+      +---------+
+               +------>+TempServer+----->+ Child2  |
+                       +----------+      +---------+
 ```
 
-`DelayManager` maintains a restart count by `child_id` and the
-`delay_fun`.
 `TempServer` (actually `TemporizedServer`) is an intermediate process
 which can delay its death relatively to its linked server.
 
-When you call `TemporizedSupervisor` functions on `FrontSup`, it
-actually proxify the query to the `MiddleSup`.
+Restart Counter, and delay computation function are kept into the supervisor
+process dictionnary.
+
+The shutdown strategy (brutal kill or max shutdown duration) is handled by the temp server.
 
 ## Installation
 

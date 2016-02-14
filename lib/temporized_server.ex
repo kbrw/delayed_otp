@@ -4,14 +4,16 @@ defmodule TemporizedServer do
   @doc """
   starts process `apply(mod,options[:function] || :start_link,args)` but
   - proc death can only occur `options[:delay]` minimum after process creation
-  - on sup termination: if proc exit takes longer than `options[:shutdown_timeout]`, then brutal kill it
+  - on sup termination: if proc exit takes longer than `options[:shutdown]`, then brutal kill it
+    (options[:shutdown] is equivalent to the sup child_spec one: :brutal_kill | int_timeout | :infinity)
   """
-  def start_link(mod,args,options \\ []), do: GenServer.start_link(__MODULE__, {mod,args,options})
+  def start_link(mod,args,options \\ []), do: 
+    GenServer.start_link(__MODULE__, {mod,args,options})
 
-  def init(mod,args,options) do
+  def init({mod,args,options}) do
     Process.flag(:trap_exit, true)
     delay = options[:delay] || 100
-    shutdown_timeout = options[:shutdown_timeout] || 100
+    shutdown = options[:shutdown] || 100
     fun = options[:function] || :start_link
     name = options[:name] || inspect({mod,fun,args})
     call_timeout = options[:call_timeout] || 5000
@@ -19,9 +21,9 @@ defmodule TemporizedServer do
     started = :erlang.system_time(:milli_seconds)
     case apply(mod, fun, args) do
       {:ok, pid} ->
-        {:ok, %{name: name, delay: delay, started: started, pid: pid, shutdown_timeout: shutdown_timeout, call_timeout: call_timeout}}
+        {:ok, %{name: name, delay: delay, started: started, pid: pid, shutdown: shutdown, call_timeout: call_timeout}}
       err ->
-        {:ok, temporized_death(err, %{name: name, delay: delay, started: started, pid: nil, shutdown_timeout: shutdown_timeout, call_timeout: call_timeout})}
+        {:ok, temporized_death(err, %{name: name, delay: delay, started: started, pid: nil, shutdown: shutdown, call_timeout: call_timeout})}
     end
   end
 
@@ -43,12 +45,13 @@ defmodule TemporizedServer do
   def handle_info(msg, state), do: (send(state.pid, msg); {:noreply, state})
 
   def terminate(_, %{pid: nil}), do: :ok
-  def terminate(reason, %{pid: pid, shutdown_timeout: timeout, name: name}) do
+  def terminate(_, %{pid: pid, shutdown: :brutal_kill}), do: Process.exit(pid, :kill)
+  def terminate(reason, %{pid: pid, shutdown: shutdown, name: name}) do
     Process.exit(pid, reason)
     receive do
       {:EXIT, ^pid, _}-> :ok
-    after timeout->
-      Logger.warn("Temporized server #{name} failed to terminate within #{timeout}, killing it brutally")
+    after shutdown->
+      Logger.warn("Temporized server #{name} failed to terminate within #{shutdown}, killing it brutally")
       Process.exit(pid, :kill)
       receive do {:EXIT, ^pid, _}-> :ok end
     end
