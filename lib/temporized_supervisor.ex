@@ -34,7 +34,7 @@ defmodule TemporizedSupervisor do
 
   defmodule MiddleSup do
     def map_childspec({id,mfa,restart,shutdown,worker,modules}) do
-      {id,{__MODULE__, :start_temporized, [id,mfa]},shutdown,worker,modules}
+      {id,{__MODULE__, :start_temporized, [id,mfa]},restart,shutdown,worker,modules}
     end
 
     def start_link(children,options) do
