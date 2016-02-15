@@ -4,13 +4,15 @@ defmodule DelayedSup do
     except that the supervisor options now supports `:delay_fun` as
     an option.
 
-    The signature of `:delay_fun` is: `(restart_count :: integer, child_id :: term) -> ms_delay_death :: integer`,
-    it takes the restart count and the id of the child and returns a delay in millisecond.
+    The signature of `:delay_fun` is: `(child_id :: term, ms_lifetime :: integer, acc :: term) -> {ms_delay_death :: integer, newacc:: term}`
+    The second argument `ms_lifetime` is the lifetime of the previously dead process.
+    First start accumulator is `nil`.
 
     This delay will be the minimum lifetime of the child in millisecond : child death will be delayed
     if it occurs too soon.
 
-    Example usage: exponential backoff restart
+    Below an example usage with an exponential backoff strategy: (200*2^count) ms
+    delay where the backoff count is reset when previous run lifetime was > 5 secondes.
 
         iex> import DelayedSup.Spec
         ...> import Bitwise

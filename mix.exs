@@ -14,6 +14,10 @@ defmodule DelayedOTP.Mixfile do
          "GitHub" => "https://github.com/awetzel/delayed_otp"
        }
      ],
+     description: """
+     Delay death of supervisor children or gen_server : for instance
+     Erlang supervisor with exponential backoff restart strategy.
+     """,
      deps: []]
   end
 
