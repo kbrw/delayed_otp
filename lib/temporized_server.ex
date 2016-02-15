@@ -29,7 +29,7 @@ defmodule TemporizedServer do
 
   def temporized_death(reason, state) do
     lifetime = :erlang.system_time(:milli_seconds) - state.started
-    Process.send_after(self, {:die, reason}, max(state.delay - lifetime, 0))
+    Process.send_after(self, {:die, reason, lifetime}, max(state.delay - lifetime, 0))
     %{state| pid: nil}
   end
 
@@ -41,7 +41,7 @@ defmodule TemporizedServer do
     Logger.info("Temporized proc #{state.name} failed : #{inspect reason}")
     {:noreply, temporized_death(reason, state)}
   end
-  def handle_info({:die, reason}, state), do: {:stop, reason, state}
+  def handle_info({:die, reason, lifetime}, state), do: {:stop, {:delayed_death,lifetime,reason}, state}
   def handle_info(msg, state), do: (send(state.pid, msg); {:noreply, state})
 
   def terminate(_, %{pid: nil}), do: :ok

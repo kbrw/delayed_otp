@@ -8,6 +8,8 @@ You can for instance :
 - get an Exponential backoff restarting strategy for children
 - normalized death time for port managed external processes 
 
+Useful to manage external service in Elixir supervisors.
+
 ## Usage
 
 All the same as `Supervisor`, but a new option is available: `:delay_fun` which is a
@@ -16,15 +18,24 @@ if it occurs too soon).
 
 The signature of `:delay_fun` is: `(restart_count :: integer, child_id :: term) -> ms_delay_death :: integer`
 
-Below an example usage with an exponential backoff strategy: (200*2^count) ms delay.
+Below an example usage with an exponential backoff strategy: (200*2^count) ms
+delay where the backoff count is reset when previous run lifetime was > 5 secondes.
 
 ```Elixir
 import TemporizedSupervisor.Spec
 import Bitwise
+@reset_backoff_lifetime 5_000
+@init_backoff_delay 200
 TemporizedSupervisor.start_link([
   worker(MyServer1,[]),
   worker(MyServer2,[])
-], restart_strategy: :one_for_one, delay_fun: fn count,_id-> 200*(1 <<< count) end)
+], restart_strategy: :one_for_one, 
+   delay_fun: fn _id,lifetime,count_or_nil->
+               count = count_or_nil || 0
+               if lifetime > @reset_backoff_lifetime, 
+                 do: {0,0}, 
+                 else: {@init_backoff_delay*(1 <<< count),count+1}
+          end)
 ```
 
 ## How it works
