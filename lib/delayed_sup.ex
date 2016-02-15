@@ -45,7 +45,7 @@ defmodule DelayedSup do
 
   ## Elixir Supervisor API
   def start_link(children, options) when is_list(children), do:
-    start_link(Supervisor.Default, Spec.supervise(children, options), options)
+    start_link(Supervisor.Default, DelayedSup.Spec.supervise(children, options), options)
   def start_link(module, arg, options \\ []) when is_list(options), do:
     GenServer.start_link(__MODULE__,{options[:name] || self,module,arg}, options)
 
