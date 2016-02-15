@@ -15,7 +15,7 @@ defmodule DelayedServer do
     delay = options[:delay] || 100
     shutdown = options[:shutdown] || 100
     fun = options[:function] || :start_link
-    name = options[:name] || inspect({mod,fun,args})
+    name = options[:name] || inspect({mod,fun})
     call_timeout = options[:call_timeout] || 5000
     Logger.debug("starting #{name} with delay of #{delay}")
     started = :erlang.system_time(:milli_seconds)
