@@ -1,4 +1,4 @@
-defmodule TemporizedSupervisorTest do
+defmodule DelayedSupTest do
   use ExUnit.Case
   require Logger
 
@@ -16,7 +16,7 @@ defmodule TemporizedSupervisorTest do
     end
     
     defmodule Elixir.TestSup1 do
-      use TemporizedSupervisor
+      use DelayedSup
       import Bitwise
     
       @reset_backoff_lifetime 5_000
@@ -39,11 +39,11 @@ defmodule TemporizedSupervisorTest do
 
   @test_duration 5_000
   @test_precision 100
-  test "exp backoff temporized restart" do
+  test "exp backoff delayed restart" do
     Agent.update(:restart_queue,fn _->[] end)
     Agent.update(:working?,fn _->false end)
     start_ts = :erlang.system_time(:milli_seconds)
-    {:ok,pid} = TemporizedSupervisor.start_link(TestSup1,[])
+    {:ok,pid} = DelayedSup.start_link(TestSup1,[])
     receive do after @test_duration-> :ok end
     queue = Agent.get(:restart_queue, & &1) |> Enum.map(& &1 - start_ts)
     expected = Stream.iterate({0,0},fn {i,dur}-> {i+1,dur + 200 * :math.pow(2,i)} end) |> 
@@ -61,7 +61,7 @@ defmodule TemporizedSupervisorTest do
     Agent.update(:restart_queue,fn _->[] end)
     Agent.update(:working?,fn _->false end)
     start_ts = :erlang.system_time(:milli_seconds)
-    {:ok,pid} = TemporizedSupervisor.start_link(TestSup1,[])
+    {:ok,pid} = DelayedSup.start_link(TestSup1,[])
     receive do after @server_recovery_after-> :ok end
     Agent.update(:working?,& !&1)
     receive do after @server_death_after-> :ok end

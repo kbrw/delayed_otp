@@ -1,4 +1,4 @@
-defmodule TemporizedServer do
+defmodule DelayedServer do
   use GenServer
   require Logger
   @doc """
@@ -23,23 +23,23 @@ defmodule TemporizedServer do
       {:ok, pid} ->
         {:ok, %{name: name, delay: delay, started: started, pid: pid, shutdown: shutdown, call_timeout: call_timeout}}
       err ->
-        {:ok, temporized_death(err, %{name: name, delay: delay, started: started, pid: nil, shutdown: shutdown, call_timeout: call_timeout})}
+        {:ok, delayed_death(err, %{name: name, delay: delay, started: started, pid: nil, shutdown: shutdown, call_timeout: call_timeout})}
     end
   end
 
-  def temporized_death(reason, state) do
+  def delayed_death(reason, state) do
     lifetime = :erlang.system_time(:milli_seconds) - state.started
     Process.send_after(self, {:die, reason, lifetime}, max(state.delay - lifetime, 0))
     %{state| pid: nil}
   end
 
-  def handle_call(:temporized_pid, _from, state), do: {:reply,state.pid,state}
+  def handle_call(:delayed_pid, _from, state), do: {:reply,state.pid,state}
   def handle_call(req, _from, state), do: {:reply,GenServer.call(state.pid,req, state.call_timeout),state}
   def handle_cast(req, state), do: (GenServer.cast(state.pid,req); {:noreply,state})
 
   def handle_info({:EXIT,_pid,reason}, state) do
-    Logger.info("Temporized proc #{state.name} failed : #{inspect reason}")
-    {:noreply, temporized_death(reason, state)}
+    Logger.info("Delayed proc #{state.name} failed : #{inspect reason}")
+    {:noreply, delayed_death(reason, state)}
   end
   def handle_info({:die, reason, lifetime}, state), do: {:stop, {:delayed_death,lifetime,reason}, state}
   def handle_info(msg, state), do: (send(state.pid, msg); {:noreply, state})
@@ -51,7 +51,7 @@ defmodule TemporizedServer do
     receive do
       {:EXIT, ^pid, _}-> :ok
     after shutdown->
-      Logger.warn("Temporized server #{name} failed to terminate within #{shutdown}, killing it brutally")
+      Logger.warn("Delayed server #{name} failed to terminate within #{shutdown}, killing it brutally")
       Process.exit(pid, :kill)
       receive do {:EXIT, ^pid, _}-> :ok end
     end

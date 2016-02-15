@@ -1,12 +1,19 @@
-defmodule TemporizedOTP.Mixfile do
+defmodule DelayedOTP.Mixfile do
   use Mix.Project
 
   def project do
-    [app: :temporized_otp,
+    [app: :delayed_otp,
      version: "0.0.1",
      elixir: "~> 1.2",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
+     package: [
+       maintainers: ["Arnaud Wetzel"],
+       licenses: ["MIT"],
+       links: %{
+         "GitHub" => "https://github.com/awetzel/delayed_otp"
+       }
+     ],
      deps: []]
   end
 

@@ -1,4 +1,4 @@
-defmodule TemporizedSupervisor do
+defmodule DelayedSup do
   @moduledoc """
     The API is exactly the same as Elixir stdlib `Supervisor`,
     except that the supervisor options now supports `:delay_fun` as
@@ -12,9 +12,9 @@ defmodule TemporizedSupervisor do
 
     Example usage: exponential backoff restart
 
-        iex> import TemporizedSupervisor.Spec
+        iex> import DelayedSup.Spec
         ...> import Bitwise
-        ...> TemporizedSupervisor.start_link([
+        ...> DelayedSup.start_link([
         ...>   worker(MyServer1,[]),
         ...>   worker(MyServer2,[])
         ...> ], restart_strategy: :one_for_one, delay_fun: fn count,_id-> 200*(1 <<< count) end)
@@ -50,7 +50,7 @@ defmodule TemporizedSupervisor do
   
   def which_children(supervisor) do
     for {id,pid,worker,modules}<-Supervisor.which_children(supervisor) do
-      {id,GenServer.call(pid,:temporized_pid),worker,modules}
+      {id,GenServer.call(pid,:delayed_pid),worker,modules}
     end
   end
 
@@ -64,7 +64,7 @@ defmodule TemporizedSupervisor do
   defmacro __using__(_) do
     quote location: :keep do
       @behaviour :supervisor
-      import TemporizedSupervisor.Spec
+      import DelayedSup.Spec
     end
   end
 
@@ -74,11 +74,11 @@ defmodule TemporizedSupervisor do
     end
 
     def map_childspec({id,mfa,restart,shutdown,worker,modules}) do
-      {id,{__MODULE__, :start_temporized, [id,mfa,shutdown]},restart,:infinity,worker,modules}
+      {id,{__MODULE__, :start_delayed, [id,mfa,shutdown]},restart,:infinity,worker,modules}
     end
 
-    def start_temporized(id,{m,f,a},shutdown) do
-      TemporizedServer.start_link(m, a, function: f, delay: Process.get({:next_delay,id},0), shutdown: shutdown)
+    def start_delayed(id,{m,f,a},shutdown) do
+      DelayedServer.start_link(m, a, function: f, delay: Process.get({:next_delay,id},0), shutdown: shutdown)
     end
 
     defdelegate [worker(mod,args), worker(mod,args,opts),
