@@ -24,11 +24,16 @@ defmodule DelayedSup do
 
   ## erlang supervisor callback delegates
   use GenServer
-  def init({supref,mod,arg}) do
+  def init({supname,mod,arg}) do
     {sup_spec,options} = mod.init(arg)
     Process.put(:delay_fun,options[:delay_fun] || fn _,_->0 end)
-    :supervisor.init({supref, Supervisor.Default, sup_spec})
+    :supervisor.init({erl_supname(supname), Supervisor.Default, sup_spec})
   end
+
+  defp erl_supname(nil), do: :self
+  defp erl_supname(sup) when is_atom(sup), do: {:local,sup}
+  defp erl_supname(sup), do: sup
+
   def handle_info({:EXIT,pid,{:delayed_death,lifetime,reason}},state) do
     {:reply,children,_} = :supervisor.handle_call(:which_children,nil,state)
     if id=Enum.find_value(children, fn {id,^pid,worker,modules}->id ; _->false end) do
@@ -47,7 +52,7 @@ defmodule DelayedSup do
   def start_link(children, options) when is_list(children), do:
     start_link(Supervisor.Default, DelayedSup.Spec.supervise(children, options), options)
   def start_link(module, arg, options \\ []) when is_list(options), do:
-    GenServer.start_link(__MODULE__,{options[:name] || self,module,arg}, options)
+    GenServer.start_link(__MODULE__,{options[:name],module,arg}, options)
 
   
   def which_children(supervisor) do
