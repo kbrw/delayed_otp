@@ -62,7 +62,7 @@ defmodule DelayedSup do
   end
 
   def start_child(supervisor, child_spec) do
-    Supervisor.start_child(supervisor, MiddleSup.map_childspec(child_spec))
+    Supervisor.start_child(supervisor, DelayedSup.Spec.map_childspec(child_spec))
   end
 
   defdelegate [stop(sup),stop(sup,r),stop(sup,r,t), count_children(sup), terminate_child(sup,child), 
