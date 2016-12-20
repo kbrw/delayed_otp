@@ -36,37 +36,56 @@ defmodule DelayedSup do
 
   def handle_info({:EXIT,pid,{:delayed_death,lifetime,reason}},state) do
     {:reply,children,_} = :supervisor.handle_call(:which_children,nil,state)
-    if id=Enum.find_value(children, fn {id,^pid,worker,modules}->id ; _->false end) do
-      acc = Process.get({:delay_acc,id},nil)
-      {delay,acc} = Process.get(:delay_fun).(id,lifetime,acc)
-      Process.put({:delay_acc,id},acc)
-      Process.put({:next_delay,id}, delay)
+    if id = Enum.find_value(children, fn {id, ^pid, _worker, _modules} -> id ; _ -> false end) do
+      acc = Process.get({:delay_acc, id}, nil)
+      {delay, acc} = Process.get(:delay_fun).(id, lifetime, acc)
+      Process.put({:delay_acc, id}, acc)
+      Process.put({:next_delay, id}, delay)
     end
     :supervisor.handle_info({:EXIT,pid,reason},state)
   end
   def handle_info(req,state), do: :supervisor.handle_info(req,state)
 
-  defdelegate [terminate(r,s),code_change(vsn,s,extra),handle_call(req,rep_to,s), handle_cast(req,s)], to: :supervisor
+  defdelegate terminate(r,s), to: :supervisor
+
+  defdelegate code_change(vsn,s,extra), to: :supervisor
+
+  defdelegate handle_call(req,rep_to,s), to: :supervisor
+
+  defdelegate handle_cast(req,s), to: :supervisor
 
   ## Elixir Supervisor API
-  def start_link(children, options) when is_list(children), do:
+  def start_link(children, options) when is_list(children) do
     start_link(Supervisor.Default, DelayedSup.Spec.supervise(children, options), options)
-  def start_link(module, arg, options \\ []) when is_list(options), do:
-    GenServer.start_link(__MODULE__,{options[:name],module,arg}, options)
-
+  end
+  
+  def start_link(module, arg, options \\ []) when is_list(options) do
+    GenServer.start_link(__MODULE__, {options[:name], module, arg}, options)
+  end
   
   def which_children(supervisor) do
-    for {id,pid,worker,modules}<-Supervisor.which_children(supervisor) do
-      {id,GenServer.call(pid,:delayed_pid),worker,modules}
+    for {id,pid,worker,modules} <- Supervisor.which_children(supervisor) do
+      {id, GenServer.call(pid, :delayed_pid), worker, modules}
     end
   end
 
   def start_child(supervisor, child_spec) do
-    Supervisor.start_child(supervisor, MiddleSup.map_childspec(child_spec))
+    Supervisor.start_child(supervisor, DelayedSup.Spec.map_childspec(child_spec))
   end
 
-  defdelegate [stop(sup),stop(sup,r),stop(sup,r,t), count_children(sup), terminate_child(sup,child), 
-               delete_child(sup,childid), restart_child(sup,childid)], to: Supervisor
+  defdelegate stop(sup), to: Supervisor
+
+  defdelegate stop(sup, r), to: Supervisor
+
+  defdelegate stop(sup, r, t), to: Supervisor
+
+  defdelegate count_children(sup), to: Supervisor
+
+  defdelegate terminate_child(sup, child), to: Supervisor
+
+  defdelegate delete_child(sup, childid), to: Supervisor
+
+  defdelegate restart_child(sup, childid), to: Supervisor
 
   defmacro __using__(_) do
     quote location: :keep do
@@ -88,7 +107,12 @@ defmodule DelayedSup do
       DelayedServer.start_link(m, a, function: f, delay: Process.get({:next_delay,id},0), shutdown: shutdown)
     end
 
-    defdelegate [worker(mod,args), worker(mod,args,opts),
-                 supervisor(mod,args), supervisor(mod,args,opts)], to: Supervisor.Spec
+    defdelegate worker(mod, args), to: Supervisor.Spec
+
+    defdelegate worker(mod, args, opts), to: Supervisor.Spec
+
+    defdelegate supervisor(mod, args), to: Supervisor.Spec
+
+    defdelegate supervisor(mod, args, opts), to: Supervisor.Spec
   end
 end
