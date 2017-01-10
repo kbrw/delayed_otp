@@ -18,7 +18,7 @@ defmodule DelayedOTP.Mixfile do
      Delay death of supervisor children or gen_server : for instance
      Erlang supervisor with exponential backoff restart strategy.
      """,
-     deps: []]
+     deps: [{:ex_doc, ">= 0.0.0", only: :dev}]]
   end
 
   def application do
