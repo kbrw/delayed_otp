@@ -3,15 +3,15 @@ defmodule DelayedOTP.Mixfile do
 
   def project do
     [app: :delayed_otp,
-     version: "0.0.3",
+     version: "0.0.4",
      elixir: ">= 1.2.0",
      build_embedded: Mix.env == :prod,
      start_permanent: Mix.env == :prod,
      package: [
-       maintainers: ["Arnaud Wetzel"],
+       maintainers: ["Arnaud Wetzel,Kbrw"],
        licenses: ["MIT"],
        links: %{
-         "GitHub" => "https://github.com/awetzel/delayed_otp"
+         "GitHub" => "https://github.com/kbrw/delayed_otp"
        }
      ],
      description: """

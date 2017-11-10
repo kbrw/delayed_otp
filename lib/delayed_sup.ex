@@ -27,7 +27,7 @@ defmodule DelayedSup do
   def init({supname,mod,arg}) do
     {sup_spec,options} = mod.init(arg)
     Process.put(:delay_fun,options[:delay_fun] || fn _,_->0 end)
-    :supervisor.init({erl_supname(supname), Supervisor.Default, sup_spec})
+    :supervisor.init({erl_supname(supname), DelayedSup.Default, sup_spec})
   end
 
   defp erl_supname(nil), do: :self
@@ -56,7 +56,7 @@ defmodule DelayedSup do
 
   ## Elixir Supervisor API
   def start_link(children, options) when is_list(children) do
-    start_link(Supervisor.Default, DelayedSup.Spec.supervise(children, options), options)
+    start_link(DelayedSup.Default, DelayedSup.Spec.supervise(children, options), options)
   end
   
   def start_link(module, arg, options \\ []) when is_list(options) do
