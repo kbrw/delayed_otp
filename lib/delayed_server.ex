@@ -22,6 +22,7 @@ defmodule DelayedServer do
     case apply(mod, fun, args) do
       {:ok, pid} ->
         {:ok, %{name: name, delay: delay, started: started, pid: pid, shutdown: shutdown, call_timeout: call_timeout}}
+      :ignore -> :ignore
       err ->
         {:ok, delayed_death(err, %{name: name, delay: delay, started: started, pid: nil, shutdown: shutdown, call_timeout: call_timeout})}
     end
