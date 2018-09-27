@@ -24,47 +24,55 @@ defmodule DelayedSup do
 
   ## erlang supervisor callback delegates
   use GenServer
-  def init({supname,mod,arg}) do
-    {sup_spec,options} = mod.init(arg)
-    Process.put(:delay_fun,options[:delay_fun] || fn _,_->0 end)
+
+  def init({supname, mod, arg}) do
+    {sup_spec, options} = mod.init(arg)
+    Process.put(:delay_fun, options[:delay_fun] || fn _, _ -> 0 end)
     :supervisor.init({erl_supname(supname), DelayedSup.Default, sup_spec})
   end
 
   defp erl_supname(nil), do: :self
-  defp erl_supname(sup) when is_atom(sup), do: {:local,sup}
+  defp erl_supname(sup) when is_atom(sup), do: {:local, sup}
   defp erl_supname(sup), do: sup
 
-  def handle_info({:EXIT,pid,{:delayed_death,lifetime,reason}},state) do
-    {:reply,children,_} = :supervisor.handle_call(:which_children,nil,state)
-    if id = Enum.find_value(children, fn {id, ^pid, _worker, _modules} -> id ; _ -> false end) do
+  def handle_info({:EXIT, pid, {:delayed_death, lifetime, reason}}, state) do
+    {:reply, children, _} = :supervisor.handle_call(:which_children, nil, state)
+
+    if id =
+         Enum.find_value(children, fn
+           {id, ^pid, _worker, _modules} -> id
+           _ -> false
+         end) do
       acc = Process.get({:delay_acc, id}, nil)
       {delay, acc} = Process.get(:delay_fun).(id, lifetime, acc)
       Process.put({:delay_acc, id}, acc)
       Process.put({:next_delay, id}, delay)
     end
-    :supervisor.handle_info({:EXIT,pid,reason},state)
+
+    :supervisor.handle_info({:EXIT, pid, reason}, state)
   end
-  def handle_info(req,state), do: :supervisor.handle_info(req,state)
 
-  defdelegate terminate(r,s), to: :supervisor
+  def handle_info(req, state), do: :supervisor.handle_info(req, state)
 
-  defdelegate code_change(vsn,s,extra), to: :supervisor
+  defdelegate terminate(r, s), to: :supervisor
 
-  defdelegate handle_call(req,rep_to,s), to: :supervisor
+  defdelegate code_change(vsn, s, extra), to: :supervisor
 
-  defdelegate handle_cast(req,s), to: :supervisor
+  defdelegate handle_call(req, rep_to, s), to: :supervisor
+
+  defdelegate handle_cast(req, s), to: :supervisor
 
   ## Elixir Supervisor API
   def start_link(children, options) when is_list(children) do
     start_link(DelayedSup.Default, DelayedSup.Spec.supervise(children, options), options)
   end
-  
+
   def start_link(module, arg, options \\ []) when is_list(options) do
     GenServer.start_link(__MODULE__, {options[:name], module, arg}, options)
   end
-  
+
   def which_children(supervisor) do
-    for {id,pid,worker,modules} <- Supervisor.which_children(supervisor) do
+    for {id, pid, worker, modules} <- Supervisor.which_children(supervisor) do
       {id, GenServer.call(pid, :delayed_pid), worker, modules}
     end
   end
@@ -96,15 +104,19 @@ defmodule DelayedSup do
 
   defmodule Spec do
     def supervise(children, options) do
-      {Supervisor.Spec.supervise(Enum.map(children,&map_childspec/1), options),options}
+      {Supervisor.Spec.supervise(Enum.map(children, &map_childspec/1), options), options}
     end
 
-    def map_childspec({id,mfa,restart,shutdown,worker,modules}) do
-      {id,{__MODULE__, :start_delayed, [id,mfa,shutdown]},restart,:infinity,worker,modules}
+    def map_childspec({id, mfa, restart, shutdown, worker, modules}) do
+      {id, {__MODULE__, :start_delayed, [id, mfa, shutdown]}, restart, :infinity, worker, modules}
     end
 
-    def start_delayed(id,{m,f,a},shutdown) do
-      DelayedServer.start_link(m, a, function: f, delay: Process.get({:next_delay,id},0), shutdown: shutdown)
+    def start_delayed(id, {m, f, a}, shutdown) do
+      DelayedServer.start_link(m, a,
+        function: f,
+        delay: Process.get({:next_delay, id}, 0),
+        shutdown: shutdown
+      )
     end
 
     defdelegate worker(mod, args), to: Supervisor.Spec
