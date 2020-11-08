@@ -1,6 +1,6 @@
 defmodule DelayedSup.Default do
   @moduledoc false
-  @behaviour :supervisor
+  use Supervisor
 
   def init(args) do
     args

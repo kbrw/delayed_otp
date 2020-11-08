@@ -29,7 +29,7 @@ defmodule DelayedServer do
 
   def delayed_death(reason, state) do
     lifetime = :erlang.system_time(:milli_seconds) - state.started
-    Process.send_after(self, {:die, reason, lifetime}, max(state.delay - lifetime, 0))
+    Process.send_after(self(), {:die, reason, lifetime}, max(state.delay - lifetime, 0))
     %{state| pid: nil}
   end
 

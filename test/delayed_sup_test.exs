@@ -8,6 +8,7 @@ defmodule DelayedSupTest do
 
     defmodule Elixir.FakeServer do
       use GenServer
+      def start_link(_) do GenServer.start_link(__MODULE__, [], name: __MODULE__) end
       def init([]) do
         if Agent.get(:working?, & &1), 
           do: {:ok,[]},
@@ -22,8 +23,8 @@ defmodule DelayedSupTest do
       @reset_backoff_lifetime 5_000
       @init_backoff_delay 200
       def init(_) do
-        supervise([
-          worker(GenServer,[FakeServer,[],[name: FakeServer]])
+        DelayedSup.init([
+          FakeServer
         ], strategy: :one_for_one, max_restarts: 9999, max_seconds: 3600, 
            delay_fun: fn _id,lifetime,count_or_nil->
                count = count_or_nil || 0
