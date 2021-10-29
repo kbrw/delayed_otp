@@ -82,3 +82,9 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
           [applications: [:delayed_otp]]
         end
 
+
+# CONTRIBUTING
+
+Hi, and thank you for wanting to contribute.
+Please refer to the centralized informations available at: https://github.com/kbrw#contributing
+
