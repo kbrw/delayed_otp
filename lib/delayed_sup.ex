@@ -12,20 +12,23 @@ defmodule DelayedSup do
     if it occurs too soon.
 
     Below an example usage with an exponential backoff strategy: (200*2^count) ms
-    delay where the backoff count is reset when previous run lifetime was > 5 secondes.
+    delay where the backoff count is reset when previous run lifetime was > 10 minutes.
 
         iex> import Bitwise
         ...> DelayedSup.start_link([
         ...>   MyServer1,
         ...>   MyServer2
-        ...> ], restart_strategy: :one_for_one, delay_fun: fn count,_id-> 200*(1 <<< count) end)
+        ...> ], restart_strategy: :one_for_one, delay_fun: fn _id, lifetime, acc ->
+        ...>    delay = if lifetime > :timer.minutes(10), do: 1, else: min((acc || 200) * 2, :timer.minutes(10))
+        ...>    {delay, delay}
+        ...>  end)
   """
 
   ## erlang supervisor callback delegates
   use GenServer
   def init({supname,mod,arg}) do
     {sup_spec,options} = mod.init(arg)
-    Process.put(:delay_fun,options[:delay_fun] || fn _,_->0 end)
+    Process.put(:delay_fun,options[:delay_fun] || fn _,_,_-> {0,0} end)
     :supervisor.init({erl_supname(supname), DelayedSup.Default, sup_spec})
   end
 
@@ -57,11 +60,11 @@ defmodule DelayedSup do
   def start_link(children, options) when is_list(children) do
     start_link(DelayedSup.Default, DelayedSup.init(children, options), options)
   end
-  
+
   def start_link(module, arg, options \\ []) when is_list(options) do
     GenServer.start_link(__MODULE__, {options[:name], module, arg}, options)
   end
-  
+
   def which_children(supervisor) do
     for {id,pid,worker,modules} <- Supervisor.which_children(supervisor) do
       {id, GenServer.call(pid, :delayed_pid), worker, modules}
