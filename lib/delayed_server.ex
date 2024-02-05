@@ -7,7 +7,7 @@ defmodule DelayedServer do
   - on sup termination: if proc exit takes longer than `options[:shutdown]`, then brutal kill it
     (options[:shutdown] is equivalent to the sup child_spec one: :brutal_kill | int_timeout | :infinity)
   """
-  def start_link(mod,args,options \\ []), do: 
+  def start_link(mod,args,options \\ []), do:
     GenServer.start_link(__MODULE__, {mod,args,options})
 
   def init({mod,args,options}) do
@@ -51,7 +51,7 @@ defmodule DelayedServer do
     receive do
       {:EXIT, ^pid, _}-> :ok
     after shutdown->
-      Logger.warn("Delayed server #{name} failed to terminate within #{shutdown}, killing it brutally")
+      Logger.warning("Delayed server #{name} failed to terminate within #{shutdown}, killing it brutally")
       Process.exit(pid, :kill)
       receive do {:EXIT, ^pid, _}-> :ok end
     end
