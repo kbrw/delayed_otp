@@ -1,6 +1,5 @@
 defmodule DelayedSupTest do
   use ExUnit.Case
-  require Logger
 
   setup_all do
     Agent.start_link(fn->true end, name: :working?)

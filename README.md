@@ -23,18 +23,22 @@ if it occurs too soon).
 The signature of `:delay_fun` is: `(child_id :: term, ms_lifetime :: integer, acc :: term) -> {ms_delay_death :: integer, newacc:: term}`
 First start accumulator is `nil`.
 
+Children can be modules, `{module, argument}` tuples, or child specification maps
+with `:id` and `:start` keys, just as with `Supervisor`. Legacy six-element child
+specifications from `DelayedSup.Spec.worker/2` and `supervisor/2` are also supported.
+The same forms work with `DelayedSup.start_child/2`.
+
 Below an example usage with an exponential backoff strategy: (200*2^count) ms
 delay where the backoff count is reset when previous run lifetime was > 5 secondes.
 
 ```Elixir
-import DelayedSup.Spec
 import Bitwise
 @reset_backoff_lifetime 5_000
 @init_backoff_delay 200
 DelayedSup.start_link([
-  worker(MyServer1,[]),
-  worker(MyServer2,[])
-], restart_strategy: :one_for_one, 
+  MyServer1,
+  {MyServer2, []}
+], strategy: :one_for_one,
    delay_fun: fn _id,lifetime,count_or_nil->
                count = count_or_nil || 0
                if lifetime > @reset_backoff_lifetime, 
@@ -87,4 +91,3 @@ If [available in Hex](https://hex.pm/docs/publish), the package can be installed
 
 Hi, and thank you for wanting to contribute.
 Please refer to the centralized informations available at: https://github.com/kbrw#contributing
-

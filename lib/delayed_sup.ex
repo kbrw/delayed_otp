@@ -18,7 +18,7 @@ defmodule DelayedSup do
         ...> DelayedSup.start_link([
         ...>   MyServer1,
         ...>   MyServer2
-        ...> ], restart_strategy: :one_for_one, delay_fun: fn _id, lifetime, acc ->
+        ...> ], strategy: :one_for_one, delay_fun: fn _id, lifetime, acc ->
         ...>    delay = if lifetime > :timer.minutes(10), do: 1, else: min((acc || 200) * 2, :timer.minutes(10))
         ...>    {delay, delay}
         ...>  end)
@@ -37,7 +37,12 @@ defmodule DelayedSup do
   defp erl_supname(sup), do: sup
 
   def handle_info({:EXIT,pid,{:delayed_death,lifetime,reason}},state) do
-    {:reply,children,_} = :supervisor.handle_call(:which_children,nil,state)
+    children =
+      case :supervisor.handle_call(:which_children, nil, state) do
+        {:reply, children, _state} -> children
+        {:reply, children, _state, _action} -> children
+      end
+
     if id = Enum.find_value(children, fn {id, ^pid, _worker, _modules} -> id ; _ -> false end) do
       acc = Process.get({:delay_acc, id}, nil)
       {delay, acc} = Process.get(:delay_fun).(id, lifetime, acc)
@@ -98,11 +103,24 @@ defmodule DelayedSup do
 
   defmodule Spec do
     def supervise(children, options) do
-      {Supervisor.Spec.supervise(Enum.map(children,&map_childspec/1), options),options}
+      {Supervisor.init(Enum.map(children,&map_childspec/1), options),options}
     end
 
     def map_childspec({id,mfa,restart,shutdown,worker,modules}) do
       {id,{__MODULE__, :start_delayed, [id,mfa,shutdown]},restart,:infinity,worker,modules}
+    end
+
+    def map_childspec(child_spec) do
+      spec = Supervisor.child_spec(child_spec, [])
+      %{id: id, start: {mod, _, _} = mfa} = spec
+      default_shutdown =
+        if Map.get(spec, :type, :worker) == :supervisor, do: :infinity, else: 5_000
+      shutdown = Map.get(spec, :shutdown, default_shutdown)
+
+      spec
+      |> Map.put(:start, {__MODULE__, :start_delayed, [id, mfa, shutdown]})
+      |> Map.put(:shutdown, :infinity)
+      |> Map.put_new(:modules, [mod])
     end
 
     def start_delayed(id,{m,f,a},shutdown) do
